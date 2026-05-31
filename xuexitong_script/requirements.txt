@@ -1,0 +1,5 @@
+## xuexitong-ppt - python version: 3.10.6+
+
+requests==2.32.3
+fpdf==1.7.2
+pillow==11.0.0
