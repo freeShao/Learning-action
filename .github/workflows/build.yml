@@ -81,7 +81,7 @@ jobs:
   package:
     name: Package ${{ matrix.artifact_name }}
     if: startsWith(github.ref, 'refs/tags/')
-    timeout-minutes: 60
+    timeout-minutes: 30
     needs: test
     runs-on: ${{ matrix.os }}
     permissions:
@@ -90,32 +90,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
-            artifact_name: medical-report-macOS-arm64
-            artifact_glob: |
-              release/medical-report-*.zip
-              release/medical-report-*.dmg
-          # macOS-x64: macos-13 (Intel) runner 队列不可用，暂跳过
-          # - os: macos-13
-          #   artifact_name: medical-report-macOS-x64
-          #   artifact_glob: |
-          #     release/medical-report-*.zip
-          #     release/medical-report-*.dmg
           - os: ubuntu-22.04
             artifact_name: medical-report-Linux-x64
             artifact_glob: |
               release/medical-report-*.tar.gz
-          - os: ubuntu-22.04-arm
-            artifact_name: medical-report-Linux-arm64
-            artifact_glob: |
-              release/medical-report-*.tar.gz
           - os: windows-latest
             artifact_name: medical-report-Windows-x64
-            artifact_glob: |
-              release/medical-report-*.zip
-          - os: windows-latest
-            artifact_name: medical-report-Windows-arm64
-            pyinstaller_arch: --target-arch arm64
             artifact_glob: |
               release/medical-report-*.zip
 
@@ -134,10 +114,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libxcb-icccm4 libxcb-image0 \
             libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0
-          # arm64 无 PyQt5 预编译 wheel，需装构建依赖从源码编译
-          dpkg --print-architecture | grep -q arm64 && \
-            sudo apt-get install -y qtbase5-dev qtchooser libgl1-mesa-dev \
-              libglib2.0-dev libdbus-1-dev libfontconfig1-dev libfreetype-dev || true
 
       - name: Install Python dependencies
         run: |
@@ -152,15 +128,7 @@ jobs:
             --add-data "README.md:." \
             --collect-all PyQt5 \
             --hidden-import PyQt5.sip \
-            ${{ matrix.pyinstaller_arch }} \
             main.py
-
-      - name: Package artifact (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          mkdir -p release
-          ditto -c -k --sequesterRsrc dist/medical-report/ release/medical-report-macOS.zip
-          test -f release/medical-report-macOS.zip && echo "macOS zip created"
 
       - name: Package artifact (Linux)
         if: runner.os == 'Linux'
