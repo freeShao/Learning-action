@@ -1,0 +1,7 @@
+## Action requirement.txt - Python==3.10.6
+
+# main module
+PyQt5>=5.15.11,<6
+
+# test
+pytest>=8.0,<10
