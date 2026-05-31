@@ -5,3 +5,6 @@ PyQt5>=5.15.11,<6
 
 # test
 pytest>=8.0,<10
+
+# build
+pyinstaller>=6.0,<7

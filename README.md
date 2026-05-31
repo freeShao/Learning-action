@@ -1,65 +1,148 @@
 # Learning-action
-学习使用 GitHub Action 功能测试仓库。
 
----
+学习使用 GitHub Actions 的 CI/CD 功能，基于 PyQt5 桌面应用的完整流程示例。
 
-## 什么是 GitHub Actions？
+## 项目结构
 
-GitHub Actions 是 GitHub 内置的 CI/CD（持续集成/持续部署）平台，让你可以在仓库中自动化软件工作流。当 Push、PR、创建 Issue 等事件发生时，可以自动触发构建、测试、部署等任务。
-
-核心概念：
-- **Workflow（工作流）**：一个可配置的自动化流程，定义在 `.github/workflows/*.yml` 中
-- **Job（作业）**：工作流中的一组步骤，默认并行执行
-- **Step（步骤）**：Job 中的单个任务（运行命令或使用 Action）
-- **Action（动作）**：可复用的单元（可以从 GitHub Marketplace 获取）
-- **Runner（运行器）**：执行工作流的服务器（GitHub 托管或自托管）
-
-## 快速开始
-
-1. 在仓库根目录创建 `.github/workflows/` 文件夹
-2. 新建一个 `.yml` 文件，例如 `ci.yml`：
-
-```yaml
-name: CI
-on: [push, pull_request]
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Run a script
-        run: echo Hello, world!
+```
+.
+├── .github/workflows/
+│   ├── build.yml             # CI/CD 工作流
+│   └── build-example.yml     # EchoMusic 开源项目参考
+├── tests/
+│   ├── conftest.py           # pytest 配置（offscreen 模式）
+│   └── test_main.py          # 22 个测试用例
+├── main.py                   # PyQt5 影像报告系统
+├── requirements.txt          # Python 依赖
+├── .env.example              # 环境变量模板
+└── README.md
 ```
 
-3. Push 到 GitHub，Actions 会自动运行
+## 技术栈
 
-## 注意事项
+| 组件 | 版本 |
+|------|------|
+| Python | 3.10.6 |
+| PyQt5 | 5.15.11+ |
+| pytest | 8+ |
+| GitHub Actions | Ubuntu latest |
 
-- **Workflow 文件**必须放在 `.github/workflows/` 目录下，格式为 YAML
-- **缩进敏感**：YAML 缩进错误会导致工作流解析失败
-- **Secret 安全**：敏感信息（Token、密码）使用 `Settings > Secrets and variables > Actions` 存储，通过 `${{ secrets.XXX }}` 引用
-- **并发限制**：免费账户有并发 Job 数量和运行时长限制
-- **条件执行**：善用 `if` 条件控制步骤执行，避免不必要的资源消耗
-- **调试**：可在工作流中添加 `ACTIONS_STEP_DEBUG=true` 开启调试日志
-- **本地测试**：可使用 [act](https://github.com/nektos/act) 工具在本地运行 Actions
+## CI/CD 工作流
 
-## 多操作系统构建（Desktop 应用）
+定义在 `.github/workflows/build.yml`，共 4 个 Job，**按需串行**：
 
-**不需要**为每个操作系统单独编写工作流文件。使用 **Matrix 策略（构建矩阵）** 一行配置即可在多个 OS 上并行构建：
-
-```yaml
-jobs:
-  build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build
-        run: |
-          # 跨平台构建命令
-          # 可以使用 runner.os 条件判断不同 OS 的逻辑
+```mermaid
+graph LR
+    A[Push/PR/Tag] --> B(lint)
+    A --> C(test)
+    C --> D{is tag?}
+    D -->|yes| E(package)
+    D -->|no| F[stop]
+    E --> G(release)
 ```
 
-如果你的 Desktop 应用使用跨平台框架（如 Electron、Qt、Tauri、Flutter 等），一套构建脚本通常可以适配多系统。如果存在平台差异，可以在 Step 中用 `if: runner.os == 'Windows'` 等条件做分支处理，**无需复制整个 workflow**。
+### Job 说明
+
+| Job | 触发条件 | 作用 |
+|-----|----------|------|
+| **lint** | 所有 push/PR/tag | 语法检查 + 验证 PyQt5 可导入 |
+| **test** | 所有 push/PR/tag | Python 3.9/3.10/3.11 三版本并行跑 22 个测试 |
+| **package** | 仅 tag `v*` | PyInstaller 打包为 Linux 可执行文件 |
+| **release** | 仅 tag `v*` | 创建 GitHub Release 并上传产物 |
+
+### 触发方式
+
+```yaml
+on:
+  push:
+    branches: [ "main" ]     # 推送到 main
+    tags: [ "v*" ]           # 推送 v 开头的 tag
+  pull_request:
+    branches: [ "main" ]     # PR 到 main
+  workflow_dispatch:          # 手动触发
+```
+
+## 发布版本（Release）
+
+### 正式版
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+### Beta / 预发布版
+
+```bash
+git tag v1.0.0-beta.1
+git push origin v1.0.0-beta.1
+```
+
+根据语义化版本约定：tag 名包含 `-` 的自动标记为 **Pre-release**（如 `v1.0.0-beta.1`、`v1.0.0-rc.1`），不包含的为**正式版**。
+
+```yaml
+prerelease: ${{ contains(github.ref_name, '-') }}
+```
+
+## 本地开发
+
+### 安装
+
+```bash
+# 1. 安装系统依赖（PyQt5 xcb 插件）
+sudo apt install -y libxcb-icccm4 libxcb-image0 \
+  libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0
+
+# 2. 安装 Python 依赖
+pip install -r requirements.txt
+pip install pytest pyinstaller
+
+# 3. 配置环境变量
+cp .env.example .env
+```
+
+### 运行
+
+```bash
+python main.py
+```
+
+### 测试
+
+```bash
+python -m pytest tests/ -v
+```
+
+测试使用 `offscreen` 模式运行，无需显示器。
+
+### 打包
+
+```bash
+pyinstaller --onedir --name 影像报告系统 --windowed main.py
+```
+
+## 环境变量
+
+参考 `.env.example`：
+
+```
+SERVER_HOST=http://localhost
+SERVER_PORT=8000
+API_BASE_URL=${SERVER_HOST}:${SERVER_PORT}/api/v1
+AUTH_TOKEN=
+APP_ENV=development
+```
+
+`.env` 存放真实值（不提交到 Git），`.env.example` 存放模板（提交到 Git）。
+
+## 参考：EchoMusic 构建文件
+
+`build-example.yml` 是一个成熟的开源 Electron 桌面应用 CI/CD 示例，包含：
+
+- Matrix 多 OS 构建（macOS/Linux/Windows × arm64/x64）
+- libmpv 跨平台下载（brew / apt / 预编译包）
+- changelog 自动提取
+- Telegram + QQ 通知
+- 预发布版本识别
+
+核心设计直接参考了该项目的模式。
