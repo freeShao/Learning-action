@@ -1,0 +1,103 @@
+name: Build xuexitong-ppt-download
+
+on:
+  push:
+    tags: [ "xuexitong-*" ]
+  workflow_dispatch:
+
+concurrency:
+  group: xuexitong-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: Package Windows-x64
+    timeout-minutes: 30
+    runs-on: windows-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install Python dependencies
+        run: |
+          pip install requests fpdf2 pillow pyinstaller
+
+      - name: Install UPX
+        shell: bash
+        run: |
+          curl -sL https://github.com/upx/upx/releases/download/v4.2.4/upx-4.2.4-win64.zip -o upx.zip
+          7z x upx.zip -oupx_temp
+          mkdir -p upx
+          cp upx_temp/upx-4.2.4-win64/upx.exe upx/
+          echo "${{ github.workspace }}/upx" >> $GITHUB_PATH
+
+      - name: Build executable
+        shell: bash
+        run: |
+          pyinstaller --onefile \
+            --name "xuexitong-ppt-download" \
+            --noconsole \
+            --strip \
+            --add-data "xuexitong_script/docs/logo.png:docs" \
+            --exclude-module tkinter.test \
+            --exclude-module PIL.ImageShow \
+            --exclude-module PIL.ImageQt \
+            --exclude-module PIL.ImageGrab \
+            --exclude-module matplotlib \
+            xuexitong_script/xuexitong-ppt-download-gui.py
+
+      - name: Print size
+        shell: bash
+        run: ls -lh dist/xuexitong-ppt-download.exe
+
+      - name: Rename artifact
+        shell: bash
+        run: |
+          mkdir -p release
+          cp dist/xuexitong-ppt-download.exe release/xuexitong-ppt-download-Windows-x64.exe
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: xuexitong-Windows-x64
+          path: release/*
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: Publish Release Assets
+    if: startsWith(github.ref, 'refs/tags/')
+    timeout-minutes: 20
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -lh release-artifacts/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-artifacts/**
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          fail_on_unmatched_files: true
+          overwrite_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
