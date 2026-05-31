@@ -95,9 +95,8 @@ jobs:
             artifact_glob: |
               release/medical-report-*.zip
               release/medical-report-*.dmg
-          - os: macos-14
+          - os: macos-13
             artifact_name: medical-report-macOS-x64
-            pyinstaller_arch: --target-arch x86_64
             artifact_glob: |
               release/medical-report-*.zip
               release/medical-report-*.dmg
@@ -133,7 +132,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libxcb-icccm4 libxcb-image0 \
-            libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0
+            libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0 \
+            qtbase5-dev qt5-qmake
 
       - name: Install Python dependencies
         run: |
