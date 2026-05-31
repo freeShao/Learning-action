@@ -79,13 +79,45 @@ jobs:
         run: python -m pytest tests/ -v
 
   package:
-    name: Package desktop app
+    name: Package ${{ matrix.artifact_name }}
     if: startsWith(github.ref, 'refs/tags/')
-    timeout-minutes: 20
+    timeout-minutes: 30
     needs: test
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            artifact_name: medical-report-macOS-arm64
+            artifact_glob: |
+              release/medical-report-*.zip
+              release/medical-report-*.dmg
+          - os: macos-14
+            artifact_name: medical-report-macOS-x64
+            pyinstaller_arch: --target-arch x86_64
+            artifact_glob: |
+              release/medical-report-*.zip
+              release/medical-report-*.dmg
+          - os: ubuntu-22.04
+            artifact_name: medical-report-Linux-x64
+            artifact_glob: |
+              release/medical-report-*.tar.gz
+          - os: ubuntu-22.04-arm
+            artifact_name: medical-report-Linux-arm64
+            artifact_glob: |
+              release/medical-report-*.tar.gz
+          - os: windows-latest
+            artifact_name: medical-report-Windows-x64
+            artifact_glob: |
+              release/medical-report-*.zip
+          - os: windows-latest
+            artifact_name: medical-report-Windows-arm64
+            pyinstaller_arch: --target-arch arm64
+            artifact_glob: |
+              release/medical-report-*.zip
 
     steps:
       - name: Checkout code
@@ -96,7 +128,8 @@ jobs:
         with:
           python-version: "3.10"
 
-      - name: Install system dependencies (Qt xcb)
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y libxcb-icccm4 libxcb-image0 \
@@ -108,31 +141,50 @@ jobs:
           pip install pyinstaller
 
       - name: Build executable
+        shell: bash
         run: |
           pyinstaller --onedir \
             --name "medical-report" \
             --add-data "README.md:." \
             --collect-all PyQt5 \
             --hidden-import PyQt5.sip \
+            ${{ matrix.pyinstaller_arch }} \
             main.py
 
-      - name: Verify executable
+      - name: Package artifact (macOS)
+        if: runner.os == 'macOS'
         run: |
-          test -f dist/medical-report/medical-report && echo "Binary exists" || echo "Binary missing"
-          ls -lh dist/medical-report/
+          mkdir -p release
+          ditto -c -k --sequesterRsrc dist/medical-report/ release/medical-report-macOS.zip
+          test -f release/medical-report-macOS.zip && echo "macOS zip created"
+
+      - name: Package artifact (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p release
+          tar -czf release/medical-report-Linux.tar.gz -C dist/medical-report .
+          test -f release/medical-report-Linux.tar.gz && echo "Linux tar.gz created"
+
+      - name: Package artifact (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          mkdir -p release
+          7z a -tzip release/medical-report-Windows.zip ./dist/medical-report/*
+          test -f release/medical-report-Windows.zip && echo "Windows zip created"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: medical-report-Linux-x64
-          path: dist/medical-report/
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_glob }}
           if-no-files-found: error
           retention-days: 7
 
   release:
-    name: Publish Release
+    name: Publish Release Assets
     if: startsWith(github.ref, 'refs/tags/')
-    timeout-minutes: 10
+    timeout-minutes: 20
     needs: package
     runs-on: ubuntu-latest
     permissions:
@@ -142,20 +194,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Download build artifact
+      - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
-          name: medical-report-Linux-x64
           path: release-artifacts
+          merge-multiple: true
 
-      - name: Create archive
-        run: |
-          tar -czf medical-report-Linux-x64.tar.gz -C release-artifacts .
+      - name: List downloaded artifacts
+        run: find release-artifacts -maxdepth 2 -type f | sort
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: medical-report-Linux-x64.tar.gz
+          files: release-artifacts/**
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
           fail_on_unmatched_files: true
