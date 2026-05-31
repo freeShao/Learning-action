@@ -109,15 +109,23 @@ jobs:
 
       - name: Build executable
         run: |
-          pyinstaller --onedir --name 影像报告系统 \
+          pyinstaller --onedir \
+            --name "medical-report" \
             --add-data "README.md:." \
-            --windowed main.py
+            --collect-all PyQt5 \
+            --hidden-import PyQt5.sip \
+            main.py
+
+      - name: Verify executable
+        run: |
+          test -f dist/medical-report/medical-report && echo "Binary exists" || echo "Binary missing"
+          ls -lh dist/medical-report/
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: 影像报告系统-Linux-x64
-          path: dist/影像报告系统/
+          name: medical-report-Linux-x64
+          path: dist/medical-report/
           if-no-files-found: error
           retention-days: 7
 
@@ -137,17 +145,17 @@ jobs:
       - name: Download build artifact
         uses: actions/download-artifact@v4
         with:
-          name: 影像报告系统-Linux-x64
+          name: medical-report-Linux-x64
           path: release-artifacts
 
       - name: Create archive
         run: |
-          tar -czf 影像报告系统-Linux-x64.tar.gz -C release-artifacts .
+          tar -czf medical-report-Linux-x64.tar.gz -C release-artifacts .
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: 影像报告系统-Linux-x64.tar.gz
+          files: medical-report-Linux-x64.tar.gz
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
           fail_on_unmatched_files: true
