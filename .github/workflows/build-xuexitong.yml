@@ -2,101 +2,155 @@ name: Build xuexitong-ppt-download
 
 on:
   push:
-    tags: [ "xuexitong-*" ]
+    branches: ["main", "master"]
+    paths: ["xuexitong_script/**", "tests/test_xuexitong.py"]
   workflow_dispatch:
+    inputs:
+      version:
+        description: "分发版本号"
+        required: false
+        default: "0.0.1"
 
 concurrency:
   group: xuexitong-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  package:
-    name: Package Windows-x64
-    timeout-minutes: 30
-    runs-on: windows-latest
-    permissions:
-      contents: read
-
+  # ============================
+  # 测试（push 或 workflow_dispatch 时均运行）
+  # ============================
+  test:
+    name: Test
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Python 3.10
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
-      - name: Install Python dependencies
+      - name: Install dependencies
         run: |
-          pip install requests fpdf2 pillow pyinstaller
+          python -m pip install --upgrade pip
+          pip install requests fpdf2 pillow pytest
 
-      - name: Install UPX
+      - name: Run xuexitong tests
+        run: pytest tests/test_xuexitong.py -v
+
+  # ============================
+  # 构建 Windows x64（仅 workflow_dispatch）
+  # ============================
+  build-win64:
+    name: Build Windows x64
+    if: github.event_name == 'workflow_dispatch'
+    needs: [test]
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r xuexitong_script/requirements.txt
+          pip install pyinstaller
+
+      - name: Build with PyInstaller
         shell: bash
         run: |
-          curl -sL https://github.com/upx/upx/releases/download/v4.2.4/upx-4.2.4-win64.zip -o upx.zip
-          7z x upx.zip -oupx_temp
-          mkdir -p upx
-          cp upx_temp/upx-4.2.4-win64/upx.exe upx/
-          echo "${{ github.workspace }}/upx" >> $GITHUB_PATH
-
-      - name: Build executable
-        shell: bash
-        run: |
-          pyinstaller --onefile \
+          pyinstaller --onefile --noconsole \
             --name "xuexitong-ppt-download" \
-            --noconsole \
-            --strip \
             --add-data "xuexitong_script/docs/logo.png:docs" \
-            --exclude-module tkinter.test \
-            --exclude-module PIL.ImageShow \
-            --exclude-module PIL.ImageQt \
-            --exclude-module PIL.ImageGrab \
-            --exclude-module matplotlib \
+            --add-data "xuexitong_script/docs/simhei.ttf:docs" \
+            --distpath dist_win64 \
             xuexitong_script/xuexitong-ppt-download-gui.py
 
-      - name: Print size
-        shell: bash
-        run: ls -lh dist/xuexitong-ppt-download.exe
-
-      - name: Rename artifact
-        shell: bash
-        run: |
-          mkdir -p release
-          cp dist/xuexitong-ppt-download.exe release/xuexitong-ppt-download-Windows-x64.exe
-
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: xuexitong-Windows-x64
-          path: release/*
+          path: dist_win64/xuexitong-ppt-download.exe
           if-no-files-found: error
-          retention-days: 7
 
+  # ============================
+  # 构建 Linux x64（仅 workflow_dispatch）
+  # ============================
+  build-linux:
+    name: Build Linux x64
+    if: github.event_name == 'workflow_dispatch'
+    needs: [test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libx11-dev python3-tk
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r xuexitong_script/requirements.txt
+          pip install pyinstaller
+
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller --onefile --noconsole \
+            --name "xuexitong-ppt-download" \
+            --add-data "xuexitong_script/docs/logo.png:docs" \
+            --add-data "xuexitong_script/docs/simhei.ttf:docs" \
+            --distpath dist_linux \
+            xuexitong_script/xuexitong-ppt-download-gui.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xuexitong-Linux-x64
+          path: dist_linux/xuexitong-ppt-download
+          if-no-files-found: error
+
+  # ============================
+  # 发布 Release（仅 workflow_dispatch）
+  # ============================
   release:
-    name: Publish Release Assets
-    if: startsWith(github.ref, 'refs/tags/')
-    timeout-minutes: 20
-    needs: package
+    name: Publish Release
+    if: github.event_name == 'workflow_dispatch'
+    needs: [build-win64, build-linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
-
     steps:
-      - name: Download all build artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
         with:
           path: release-artifacts
           merge-multiple: true
 
-      - name: List artifacts
-        run: ls -lh release-artifacts/
+      - name: Generate release tag
+        id: tag
+        shell: bash
+        run: |
+          VERSION="${{ github.event.inputs.version || '0.0.1' }}"
+          echo "tag=xuexitong-v${VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.tag.outputs.tag }}
           files: release-artifacts/**
-          draft: false
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          draft: true
+          prerelease: false
           fail_on_unmatched_files: true
           overwrite_files: true
         env:

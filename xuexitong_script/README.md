@@ -1,4 +1,4 @@
-<h1 align="center">学习通PPT辅助获取脚本</h1>
+<h1 align="center">学习通 PPT 辅助下载</h1>
 
 <p align="center"><img src="docs/logo.png" alt="Logo" title="Logo" /></p>
 
@@ -94,13 +94,7 @@ xuexitong_script/
 如需分发给没有 Python 环境的 Windows 用户，可用 PyInstaller 打包为单文件 exe：
 
 ```bash
-pip install pyinstaller upx
-pyinstaller --onefile --noconsole --strip ^
-  --add-data "docs/logo.png;docs" ^
-  --exclude-module tkinter.test ^
-  --exclude-module PIL.ImageShow ^
-  --exclude-module PIL.ImageQt ^
-  xuexitong-ppt-download-gui.py
+
 ```
 
 产物在 `dist/xuexitong-ppt-download.exe`，约 **15~20 MB**。
