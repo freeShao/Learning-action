@@ -164,7 +164,6 @@ jobs:
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
           files: release-artifacts/**
-          draft: true
           prerelease: false
           fail_on_unmatched_files: true
           overwrite_files: true
