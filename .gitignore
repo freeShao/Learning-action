@@ -86,6 +86,8 @@ __pycache__/
 build/
 develop-eggs/
 dist/
+dist_linux/
+dist_win64/
 downloads/
 eggs/
 .eggs/
@@ -93,6 +95,8 @@ eggs/
 lib64/
 parts/
 sdist/
+dist_linux/
+dist_win64/
 var/
 wheels/
 share/python-wheels/
@@ -787,11 +791,15 @@ Tmp/*
 build/
 develop-eggs/
 dist/
+dist_linux/
+dist_win64/
 downloads/
 eggs/
 .eggs/
 parts/
 sdist/
+dist_linux/
+dist_win64/
 var/
 wheels/
 *.egg-info/
@@ -886,7 +894,9 @@ Tmps/*
 logs/*
 cache/*
 errors/*
-dist/*
+dist/
+dist_linux/
+dist_win64/*
 build/*
 *.pydevproject
 log.txt

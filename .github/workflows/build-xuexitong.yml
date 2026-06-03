@@ -1,4 +1,4 @@
-name: Build xuexitong-ppt-download
+name: Build xuexitong_script
 
 on:
   push:
@@ -12,7 +12,7 @@ on:
         default: "0.0.1"
 
 concurrency:
-  group: xuexitong-${{ github.ref }}
+  group: xuexitong_script-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -60,20 +60,32 @@ jobs:
           pip install -r xuexitong_script/requirements.txt
           pip install pyinstaller
 
+      - name: Generate .ico
+        shell: bash
+        run: |
+          python3 -c "
+          from PIL import Image
+          img = Image.open('xuexitong_script/docs/logo.png')
+          img.save('xuexitong_script/docs/logo.ico', format='ICO', sizes=[(32,32)])
+          "
+
       - name: Build with PyInstaller
         shell: bash
         run: |
+          VERSION="${{ github.event.inputs.version || '0.0.1' }}"
           pyinstaller --onefile --noconsole \
-            --name "xuexitong-ppt-download" \
+            --name "xuexitong_script" \
             --add-data "xuexitong_script/docs/logo.png:docs" \
-            --add-data "xuexitong_script/docs/simhei.ttf:docs" \
+            --icon "xuexitong_script/docs/logo.ico" \
             --distpath dist_win64 \
             xuexitong_script/xuexitong-ppt-download-gui.py
+          mv dist_win64/xuexitong_script.exe \
+             "dist_win64/xuexitong_script-v${VERSION}-win64.exe"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: xuexitong-Windows-x64
-          path: dist_win64/xuexitong-ppt-download.exe
+          name: xuexitong_script-Windows-x64
+          path: dist_win64/xuexitong_script-v*.exe
           if-no-files-found: error
 
   # ============================
@@ -106,17 +118,20 @@ jobs:
 
       - name: Build with PyInstaller
         run: |
+          VERSION="${{ github.event.inputs.version || '0.0.1' }}"
           pyinstaller --onefile --noconsole \
-            --name "xuexitong-ppt-download" \
+            --name "xuexitong_script" \
             --add-data "xuexitong_script/docs/logo.png:docs" \
-            --add-data "xuexitong_script/docs/simhei.ttf:docs" \
+            --icon "xuexitong_script/docs/logo.png" \
             --distpath dist_linux \
             xuexitong_script/xuexitong-ppt-download-gui.py
+          mv dist_linux/xuexitong_script \
+             "dist_linux/xuexitong_script-v${VERSION}-linux-x64"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: xuexitong-Linux-x64
-          path: dist_linux/xuexitong-ppt-download
+          name: xuexitong_script-Linux-x64
+          path: dist_linux/xuexitong_script-v*-linux-x64
           if-no-files-found: error
 
   # ============================
@@ -142,7 +157,7 @@ jobs:
         shell: bash
         run: |
           VERSION="${{ github.event.inputs.version || '0.0.1' }}"
-          echo "tag=xuexitong-v${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=xuexitong_script-v${VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2

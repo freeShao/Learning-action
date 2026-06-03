@@ -16,7 +16,12 @@ from mainScript import (
 )
 
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
+if getattr(sys, 'frozen', False):
+    APP_DIR = os.path.dirname(sys.executable)
+    RES_DIR = sys._MEIPASS
+else:
+    APP_DIR = os.path.dirname(os.path.abspath(__file__))
+    RES_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # 主背景色（淡灰）
 BG_COLOR = "#f0f0f0"
@@ -50,7 +55,7 @@ class App(tk.Tk):
         self.resizable(True, True)
         self.configure(bg=BG_COLOR)
 
-        icon_path = os.path.join(current_dir, "docs", "logo.png")
+        icon_path = os.path.join(RES_DIR, "docs", "logo.png")
         if os.path.exists(icon_path):
             self.tk.call("wm", "iconphoto", self._w, tk.PhotoImage(file=icon_path))
 
@@ -79,12 +84,12 @@ class App(tk.Tk):
         self._build_log()
 
     def _make_label(self, parent, text, **kw):
-        kw.setdefault("font", (self.font_cn, 10))
+        kw.setdefault("font", (self.font_cn, 12))
         kw.setdefault("bg", BG_COLOR)
         return tk.Label(parent, text=text, **kw)
 
     def _make_entry(self, parent, variable, **kw):
-        kw.setdefault("font", (self.font_cn, 10))
+        kw.setdefault("font", (self.font_cn, 12))
         kw.setdefault("bg", FG_COLOR)
         kw.setdefault("relief", tk.SUNKEN)
         kw.setdefault("bd", 2)
@@ -96,14 +101,14 @@ class App(tk.Tk):
 
         tk.Label(
             frame, text="学习通 PPT 辅助下载",
-            fg="#c0392b", font=(self.font_cn, 20, "bold"),
+            fg="#c0392b", font=(self.font_cn, 24, "bold"),
             bg=BG_COLOR
         ).pack()
 
         tk.Label(
             frame,
             text="Github.com/freeShao/Learning-action/xuexitong_script",
-            fg="#555555", font=(self.font_cn, 9),
+            fg="#555555", font=(self.font_cn, 11),
             bg=BG_COLOR
         ).pack()
 
@@ -118,23 +123,27 @@ class App(tk.Tk):
             .grid(row=0, column=1, columnspan=2, sticky=tk.W, padx=(5, 0), pady=3)
 
         # 起始 / 结束 / 检测按钮
-        self._make_label(frame, "起始页：")\
-            .grid(row=1, column=0, sticky=tk.W, pady=3)
-        self._make_entry(frame, self.start_var, width=10)\
-            .grid(row=1, column=1, sticky=tk.W, padx=(5, 0), pady=3)
+        sub = tk.Frame(frame, bg=BG_COLOR)
+        sub.grid(row=1, column=0, columnspan=3, sticky=tk.W, pady=3)
 
-        self._make_label(frame, "结束页：")\
-            .grid(row=1, column=1, sticky=tk.W, padx=(100, 0), pady=3)
-        self._make_entry(frame, self.end_var, width=10)\
-            .grid(row=1, column=1, sticky=tk.W, padx=(160, 0), pady=3)
+        self._make_label(sub, "起始页：").grid(row=0, column=0, sticky=tk.W)
+        self._make_entry(sub, self.start_var, width=10)\
+            .grid(row=0, column=1, padx=(5, 0))
+
+        tk.Label(sub, text="  ", bg=BG_COLOR)\
+            .grid(row=0, column=2, padx=(8, 4))
+
+        self._make_label(sub, "结束页：").grid(row=0, column=3, sticky=tk.W)
+        self._make_entry(sub, self.end_var, width=10)\
+            .grid(row=0, column=4, padx=(5, 0))
 
         self.btn_detect = tk.Button(
-            frame, text="自动检测页数",
+            sub, text="自动检测页数",
             command=self._detect_pages,
-            font=(self.font_cn, 9), padx=5, bg="#607D8B", fg="white",
+            font=(self.font_cn, 11), padx=5, bg="#607D8B", fg="white",
             relief=tk.RAISED, bd=2
         )
-        self.btn_detect.grid(row=1, column=2, sticky=tk.W, padx=(12, 0), pady=3)
+        self.btn_detect.grid(row=0, column=5, padx=(10, 0))
 
         # PDF 文件名
         self._make_label(frame, "PDF 文件名：")\
@@ -150,7 +159,7 @@ class App(tk.Tk):
             frame, text="开始下载并生成 PDF",
             command=self._start_task,
             bg="#27AE60", fg="white",
-            font=(self.font_cn, 11, "bold"),
+            font=(self.font_cn, 14, "bold"),
             padx=14, pady=4, relief=tk.RAISED, bd=2
         )
         self.btn_start.pack(side=tk.LEFT, padx=6)
@@ -164,7 +173,7 @@ class App(tk.Tk):
         inner.pack(padx=10, pady=6, fill=tk.X)
 
         # 标题
-        tk.Label(inner, text="缓存清理", font=(self.font_cn, 10, "bold"),
+        tk.Label(inner, text="缓存清理", font=(self.font_cn, 12, "bold"),
                  bg=BG_COLOR, fg="#c0392b")\
             .grid(row=0, column=0, sticky=tk.W, pady=2)
 
@@ -173,7 +182,7 @@ class App(tk.Tk):
         list_frame.grid(row=1, column=0, columnspan=5, sticky=tk.W+tk.E, pady=4)
 
         self.cache_listbox = tk.Listbox(list_frame, height=3, width=50,
-                                        font=(self.font_cn, 9), bg=FG_COLOR,
+                                        font=(self.font_cn, 11), bg=FG_COLOR,
                                         selectmode=tk.SINGLE, exportselection=False)
         self.cache_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
@@ -188,7 +197,7 @@ class App(tk.Tk):
         self.btn_refresh = tk.Button(
             btn_frame, text="刷新目录列表",
             command=self._refresh_cache_list,
-            font=(self.font_cn, 9), padx=6, bg="#455A64", fg="white",
+            font=(self.font_cn, 11), padx=6, bg="#455A64", fg="white",
             relief=tk.RAISED, bd=2
         )
         self.btn_refresh.pack(side=tk.LEFT, padx=3)
@@ -196,7 +205,7 @@ class App(tk.Tk):
         self.btn_del_folder = tk.Button(
             btn_frame, text="删除选中文件夹",
             command=self._delete_selected_folder,
-            font=(self.font_cn, 9), padx=6, bg="#E67E22", fg="white",
+            font=(self.font_cn, 11), padx=6, bg="#E67E22", fg="white",
             relief=tk.RAISED, bd=2
         )
         self.btn_del_folder.pack(side=tk.LEFT, padx=3)
@@ -204,7 +213,7 @@ class App(tk.Tk):
         self.btn_clean_all = tk.Button(
             btn_frame, text="清空全部缓存",
             command=self._clean_all_cache,
-            font=(self.font_cn, 9), padx=6, bg="#C0392B", fg="white",
+            font=(self.font_cn, 11), padx=6, bg="#C0392B", fg="white",
             relief=tk.RAISED, bd=2
         )
         self.btn_clean_all.pack(side=tk.LEFT, padx=3)
@@ -220,7 +229,8 @@ class App(tk.Tk):
         txt_frame.pack(fill=tk.BOTH, expand=True)
 
         self.text_log = tk.Text(txt_frame, height=10, font=("Consolas", 9),
-                                bg=FG_COLOR, relief=tk.SUNKEN, bd=2)
+                                bg=FG_COLOR, relief=tk.SUNKEN, bd=2,
+                                state=tk.DISABLED)
         self.text_log.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         scb = tk.Scrollbar(txt_frame, command=self.text_log.yview)
@@ -258,12 +268,16 @@ class App(tk.Tk):
         return "fixed"
 
     def _clear_log(self):
+        self.text_log.config(state=tk.NORMAL)
         self.text_log.delete(1.0, tk.END)
+        self.text_log.config(state=tk.DISABLED)
 
     def _log(self, message):
         """主线程安全地追加日志"""
+        self.text_log.config(state=tk.NORMAL)
         self.text_log.insert(tk.END, message)
         self.text_log.see(tk.END)
+        self.text_log.config(state=tk.DISABLED)
 
     def _process_log_queue(self):
         """主线程轮询：50ms 间隔读取队列并刷新 UI"""
@@ -282,7 +296,7 @@ class App(tk.Tk):
         self.after(50, self._process_log_queue)
 
     def _get_images_dir(self):
-        path = os.path.join(current_dir, "images")
+        path = os.path.join(APP_DIR, "images")
         os.makedirs(path, exist_ok=True)
         return os.path.abspath(path)
 
@@ -372,7 +386,7 @@ class App(tk.Tk):
             return
 
         path_img = self._get_images_dir()
-        path_pdf = os.path.join(current_dir, "out_pdf")
+        path_pdf = os.path.join(APP_DIR, "out_pdf")
         os.makedirs(path_pdf, exist_ok=True)
 
         self._running = True
